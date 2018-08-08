@@ -1,0 +1,8 @@
+requirements:
+    avr-libc
+    avrdude
+    binutils-avr
+    gcc-avr
+    srecord
+optional:
+    gdb-avr simulavr
