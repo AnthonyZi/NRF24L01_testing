@@ -1,32 +1,29 @@
-#define F_CPU       1000000UL // 1MHz
+#define F_CPU       8000000UL // 1MHz
 
 #include <avr/io.h>
 #include <util/delay.h>
 
-#define DDR_LED     DDRB
-#define DD_LED1     DDB0
-#define DD_LED2     DDB1
+#define DDR_LED     DDRD
 
 #define PORT_LED    PORTB
-#define P_LED1      PB0
-#define P_LED2      PB1
 
 void init_leds()
 {
-    DDR_LED = (1<<DD_LED1);
+    DDR_LED = 0xFF
 }
 
-void toggle_leds()
+void led_show(uint8_t number)
 {
-    PORT_LED ^= ((1<<P_LED1)|(1<<P_LED2));
+    PORT_LED = number;
 }
 
 int main(void)
 {
     init_leds();
+    uint8_t counter = 0;
     while(1)
     {
-        toggle_leds();
+        led_show(counter++);
         _delay_ms(1000);
     }
 }
