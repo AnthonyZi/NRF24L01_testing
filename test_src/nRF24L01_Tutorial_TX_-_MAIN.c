@@ -43,12 +43,13 @@ int main(void)
         TIMSK0 |= ( (1<<TOIE0));
         #endif // __AVR_ATmega88A__
 
+    DDRB |= 0b00000100;
     while(1)
     {
                 if (timercounter >= 30)                 //30 entspricht ~1 Sekunde bei 8MHz
                         {
                                 timercounter = 0;
-
+                                PORTB ^= 0b00000100;
 
                                 for (k=0; k<=wl_module_PAYLOAD-1; k++)
                                 {

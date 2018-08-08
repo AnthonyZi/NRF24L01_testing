@@ -26,6 +26,8 @@
 
 */
 
+#define F_CPU 8000000UL
+
 #include "wl_module.h"
 #include "nRF24L01.h"
 #include "spi.h"
