@@ -11,8 +11,8 @@ int main()
 //    data[3] = 77;
     while(1)
     {
-        twi_init(3, 255);
+        twi_init(2, 255);
         twi_write_data(0x4d,(uint8_t*)s,26);
-        _delay_ms(2000);
+//        _delay_ms(2000);
     }
 }
