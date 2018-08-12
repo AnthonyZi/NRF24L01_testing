@@ -21,13 +21,15 @@
 //    delayMicroseconds(t_fill_rest);
 //}
 
-twi_s* twi_init(uint8_t scl, uint8_t sda, uint8_t address)
+twi_s* twi_init(uint8_t scl, uint8_t sda, uint8_t address, void (*twi_callback)(uint8_t*,uint8_t))
 {
     twi_s *twi = (twi_s*)malloc(sizeof(twi_s));
     twi->scl = scl;
     twi->sda = sda;
     twi->address = address;
     twi->status = 0;
+    twi->data = (uint8_t*)malloc(sizeof(uint8_t));
+    twi->twi_callback = twi_callback;
 
     pinMode(twi->scl, INPUT);
     pinMode(twi->sda, INPUT);
@@ -44,28 +46,29 @@ void twi_listen(twi_s *twi)
     {
         if(twi->status == 0)        //wait_start
         {
-            printf("wait_start\n");
-            fflush(stdout);
+////            printf("wait_start\n");
+////            fflush(stdout);
             twi_wait_start(twi);
             twi_wait_scl_pull(twi);
             twi->status = 1;
         }
         if(twi->status == 1)        //address_check
         {
-            printf("address_check\n");
-            fflush(stdout);
+////            printf("address_check\n");
+////            fflush(stdout);
             twi_receive_byte(twi);
         }
         while(twi->status >= 2)     //receive_mode
         {
-            printf("receive_mode\n");
-            fflush(stdout);
-            twi_receive_byte(twi);
+////            printf("receive_mode\n");
+////            fflush(stdout);
+            *(twi->data+(twi->data_counter++)) = twi_receive_byte(twi);
         }
+        twi->twi_callback(twi->data,twi->data_counter);
     }
 }
 
-void twi_receive_byte(twi_s *twi)
+uint8_t twi_receive_byte(twi_s *twi)
 {
     uint8_t i;
     uint8_t byte = 0;
@@ -79,21 +82,21 @@ void twi_receive_byte(twi_s *twi)
                 break;
             case 1:         // START/REPEATED START BIT
                 twi->status = 1;
-                printf("start/repeated start\n");
-                fflush(stdout);
-                return;
+////                printf("start/repeated start\n");
+////                fflush(stdout);
+                return 0;
             case 2:         // STOP BIT
                 twi->status = 0;
-                printf("stop\n");
-                fflush(stdout);
-                return;
+////                printf("stop\n");
+////                fflush(stdout);
+                return 0;
             default:
-                printf("default\n");
-                fflush(stdout);
+////                printf("default\n");
+////                fflush(stdout);
                 break;
         }
     }
-    twi_check_byte(twi, byte);
+    return twi_check_byte(twi, byte);
 }
 
 void twi_wait_start(twi_s *twi)
@@ -116,7 +119,11 @@ uint8_t twi_wait_scl_pull(twi_s *twi)
     uint8_t begin_sda = digitalRead(twi->sda);
     while(digitalRead(twi->scl) == 1 && digitalRead(twi->sda) == begin_sda);
     if(digitalRead(twi->scl) == 0)
+    {
+        pinMode(twi->scl, OUTPUT);
+        digitalWrite(twi->scl, 0);
         return 0;           // clock cycle
+    }
     else if(begin_sda == 1)
     {
         return 1;           // START/REPEATED START BIT
@@ -129,11 +136,12 @@ uint8_t twi_wait_scl_pull(twi_s *twi)
 
 void twi_wait_scl_release(twi_s *twi)
 {
+    pinMode(twi->scl, INPUT);
     while(digitalRead(twi->scl) == 0);
     return;
 }
 
-void twi_check_byte(twi_s *twi, uint8_t byte)
+uint8_t twi_check_byte(twi_s *twi, uint8_t byte)
 {
     switch(twi->status)
     {
@@ -142,26 +150,29 @@ void twi_check_byte(twi_s *twi, uint8_t byte)
             {
                 twi_ack(twi);
                 if((byte & 1) == 0)
+                {
                     twi->status = 2;
+                    twi->data_counter = 0;
+                }
                 else
                     twi->status = 3;
             }
-            printf("%d\n",byte);
-            fflush(stdout);
+////            printf("%d\n",byte);
+////            fflush(stdout);
             break;
         case 2:             //receive_mode
             twi_ack(twi);
-            printf("%d\n",byte);
-            fflush(stdout);
+            return byte;
             break;
         case 3:
             twi_ack(twi);
-            printf("not yet implemented %d\n",byte);
-            fflush(stdout);
+//            return byte;
+////            printf("not yet implemented %d\n",byte);
+////            fflush(stdout);
         default:
             break;
     }
-
+    return 0;
 }
 
 void twi_ack(twi_s *twi)
