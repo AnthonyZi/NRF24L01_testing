@@ -25,3 +25,9 @@ check if avr is connected properly:
 flashing:
 #    avrdude -p atmega8 -c PROGRAMMER -U flash:w:a.hex:i -F -P 
     avrdude -p atmega8 -c PROGRAMMER -v -U flash:w:a.hex:i
+
+fuse bits:
+# 8MHz internal RC
+avrdude -p atmega8 -c rpi_1 -v -U lfuse:w:0xE4:m -U hfuse:w:0xD9:m
+# 4MHz internal RC
+avrdude -p atmega8 -c rpi_1 -v -U lfuse:w:0xE1:m -U hfuse:w:0xD9:m

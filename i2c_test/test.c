@@ -3,15 +3,16 @@
 
 int main()
 {
-    uint8_t data[4];
-    data[0] = 0x0a;
-    data[1] = 0xb3;
-    data[2] = 0x5e;
-    data[3] = 0x33;
+    char* s = "abcdefghijklmnopqrstuvwxyz";
+//    uint8_t data[10];
+//    data[0] = 10;
+//    data[1] = 179;
+//    data[2] = 230;
+//    data[3] = 77;
     while(1)
     {
-        twi_init();
-        twi_write_data(0xa5,data,4);
+        twi_init(3, 255);
+        twi_write_data(0x4d,(uint8_t*)s,26);
         _delay_ms(2000);
     }
 }

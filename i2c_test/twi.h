@@ -8,10 +8,10 @@
 #include <avr/io.h>
 #include <util/twi.h>
 
-#define  SCL_FREQ        100000UL
+#define  SCL_FREQ        10000UL
 #define  MAX_ATTEMPTS    200
 
-void twi_init();
+void twi_init(uint8_t prescaler, uint8_t bitrate);
 
 // return ...
 int twi_start();

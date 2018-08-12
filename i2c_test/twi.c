@@ -1,13 +1,16 @@
 #include "twi.h"
 
-void twi_init()
+void twi_init(uint8_t prescaler, uint8_t bitrate)
 {
-    TWSR = 0;
-#if F_CPU < 3600000UL
-    TWBR = 10;
-#else
-    TWBR = (F_CPU/(2*SCL_FREQ)) - 8;
-#endif
+    TWSR = prescaler & 0b111;
+    TWBR = bitrate;
+//    TWSR = 0;
+//#if F_CPU < 3600000UL
+//    TWBR = 10;
+//#else
+////    TWBR = (F_CPU/(2*SCL_FREQ)) - 8;
+//    TWBR = (FCPU-16*SCL_FREQ)/(2*TWSR);
+//#endif
 }
 
 // return ...
@@ -129,6 +132,7 @@ int twi_write_data(uint8_t address, uint8_t *data, uint8_t len)
                 twi_stop();
                 return 3;
         }
+        twi_stop();
         return 0;
     }
     return 4;
