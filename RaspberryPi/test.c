@@ -78,7 +78,11 @@ unsigned long timeoutPeriod = 3000;     // Set a user-defined timeout period. Wi
 
 // Radio pipe addresses for the 2 nodes to communicate.
 // const uint8_t pipes[][6] = {"1Node","2Node"};
+<<<<<<< HEAD
 const uint64_t pipes[2] = {0xC2C2C2C2C2LL, 0xE7E7E7E7E7LL};   // Radio pipe addresses for the 2 nodes to communicate.
+=======
+const uint64_t pipes[2] = { 0xE7E7E7E7E7LL, 0xC2C2C2C2C2LL };   // Radio pipe addresses for the 2 nodes to communicate.
+>>>>>>> d5095c9971bdcae29aa8cee02f788f79834fbbc0
 char data[32] = {"Bla Message - does it work?"};            //Data buffer
 
 int data_received(char *data, uint8_t len)
@@ -95,19 +99,17 @@ int data_received(char *data, uint8_t len)
 
 void showData(void)
 {
-//    if(data_received(data,32))
-    if(1)
+    if(data_received(data,32))
+//    if(1)
     {
         printf("Data: ");
         for(int i=0; i<32; i++){
-            printf("%u ", data[i]);
-//            if(isprint(data[i]))
-//                printf("%c", data[i]);
-//            else
-//                printf(".");
+            if(isprint(data[i]))
+                printf("%c", data[i]);
+            else
+                printf(".");
         }
         printf("\n\r");
-        fflush(stdout);
     }
 }
 

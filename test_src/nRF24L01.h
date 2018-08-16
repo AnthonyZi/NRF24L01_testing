@@ -121,11 +121,11 @@
 #define STATUS_DEFAULT_VAL              0x0E
 #define OBSERVE_TX_DEFAULT_VAL          0x00
 #define CD_DEFAULT_VAL                  0x00
-#define RX_ADDR_P0_B0_DEFAULT_VAL       0xE7
-#define RX_ADDR_P0_B1_DEFAULT_VAL       0xE7
-#define RX_ADDR_P0_B2_DEFAULT_VAL       0xE7
-#define RX_ADDR_P0_B3_DEFAULT_VAL       0xE7
-#define RX_ADDR_P0_B4_DEFAULT_VAL       0xE7
+#define RX_ADDR_P0_B0_DEFAULT_VAL       0xF3
+#define RX_ADDR_P0_B1_DEFAULT_VAL       0xF3
+#define RX_ADDR_P0_B2_DEFAULT_VAL       0xF3
+#define RX_ADDR_P0_B3_DEFAULT_VAL       0xF3
+#define RX_ADDR_P0_B4_DEFAULT_VAL       0xF3
 #define RX_ADDR_P1_B0_DEFAULT_VAL       0xC2
 #define RX_ADDR_P1_B1_DEFAULT_VAL       0xC2
 #define RX_ADDR_P1_B2_DEFAULT_VAL       0xC2
