@@ -2,6 +2,7 @@
 #define _SPI_H_
 
 #include <avr/io.h>
+#include <avr/interrupt.h>
 
 #define DDR_SPI         DDRB
 #define DD_SPI_SS       DDB2
@@ -13,6 +14,9 @@
 #define P_SPI_MOSI      PB3
 #define P_SPI_MISO      PB4
 #define P_SPI_SCK       PB5
+
+#define SPI_SS_HI               PORT_SPI |= (1<<P_SPI_SS)
+#define SPI_SS_LO               PORT_SPI &= ~(1<<P_SPI_SS)
 
 void spi_init();
 
