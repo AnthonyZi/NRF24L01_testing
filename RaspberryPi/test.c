@@ -1,209 +1,298 @@
-/*
-2015-04-06 : Johan Boeckx - Arduino/RPi(2) nRF24L01+ : Raspberry Pi (2) code
-  Tested on Arduino UNO R3 and Raspberry Pi B Rev. 2.0 and Raspberry Pi 2 B
+#include "spi.h"
+#include "twi.h"
+#include "rf24.h"
+#include <stdlib.h>
+#include <string.h>
+#include <util/delay.h>
 
- Copyright (C) 2011 J. Coliz <maniacbug@ymail.com>
+#define DDR_RF24        DDRD
+#define DD_RF24_CE      DDD1
+#define DD_RF24_IRQ     DDD2
+#define PORT_RF24       PORTD
+#define P_RF24_CE       PD1
+#define P_RF24_IRQ      PD2
 
-This program is free software; you can redistribute it and/or
-modify it under the terms of the GNU General Public License
-version 2 as published by the Free Software Foundation.
-
- 03/17/2013 : Charles-Henri Hallard (http://hallard.me)
-              Modified to use with Arduipi board http://hallard.me/arduipi
-                          Changed to use modified bcm2835 and RF24 library
-TMRh20 2014 - Updated to work with optimized RF24 Arduino library
-
-*/
-
-#include <cstdlib>
-#include <iostream>
-#include <sstream>
-#include <string>
-#include <RF24/RF24.h>
-
-using namespace std;
-//
-// Hardware configuration
-// Configure the appropriate pins for your connections
-
-/****************** Raspberry Pi ***********************/
-
-// Radio CE Pin, CSN Pin, SPI Speed
-// See http://www.airspayce.com/mikem/bcm2835/group__constants.html#ga63c029bd6500167152db4e57736d0939 and the related enumerations for pin information.
-
-// Setup for GPIO 22 CE and CE0 CSN with SPI Speed @ 4Mhz
-//RF24 radio(RPI_V2_GPIO_P1_22, BCM2835_SPI_CS0, BCM2835_SPI_SPEED_4MHZ);
-
-// NEW: Setup for RPi B+
-//RF24 radio(RPI_BPLUS_GPIO_J8_15,RPI_BPLUS_GPIO_J8_24, BCM2835_SPI_SPEED_8MHZ);
-
-// Setup for GPIO 15 CE and CE0 CSN with SPI Speed @ 8Mhz
-//RF24 radio(RPI_V2_GPIO_P1_15, RPI_V2_GPIO_P1_24, BCM2835_SPI_SPEED_8MHZ);
-
-// RPi generic:
-RF24 radio(22,0);
-
-/*** RPi Alternate ***/
-//Note: Specify SPI BUS 0 or 1 instead of CS pin number.
-// See http://tmrh20.github.io/RF24/RPi.html for more information on usage
-
-//RPi Alternate, with MRAA
-//RF24 radio(15,0);
-
-//RPi Alternate, with SPIDEV - Note: Edit RF24/arch/BBB/spi.cpp and  set 'this->device = "/dev/spidev0.0";;' or as listed in /dev
-//RF24 radio(22,0);
+#define RF24_SS_LO      SPI_SS_LO
+#define RF24_SS_HI      SPI_SS_HI
+#define RF24_CE_LO      PORT_RF24 &= ~(1<<P_RF24_CE)
+#define RF24_CE_HI      PORT_RF24 |= (1<<P_RF24_CE)
 
 
-/****************** Linux (BBB,x86,etc) ***********************/
+// 6:0 -> use rf channel 2
+#define VAR_RF_CHANNEL  0x01
+// datarate, tx power, continuous wave, pll lock
+#define VAR_RF_SETUP    (RF24_RF_SETUP_RF_DR_250 | RF24_RF_SETUP_RF_PWR_18)
+// IRQ setup, enable CRC, CRC-setting, RX/TX POWER UP, RX/TX control
+#define VAR_CONFIG      (RF24_CONFIG_MASK_RX_DR | RF24_CONFIG_EN_CRC | RF24_CONFIG_CRCO)
 
-// See http://tmrh20.github.io/RF24/pages.html for more information on usage
-// See http://iotdk.intel.com/docs/master/mraa/ for more information on MRAA
-// See https://www.kernel.org/doc/Documentation/spi/spidev for more information on SPIDEV
-
-// Setup for ARM(Linux) devices like BBB using spidev (default is "/dev/spidev1.0" )
-//RF24 radio(115,0);
-
-//BBB Alternate, with mraa
-// CE pin = (Header P9, Pin 13) = 59 = 13 + 46
-//Note: Specify SPI BUS 0 or 1 instead of CS pin number.
-//RF24 radio(59,0);
-
-/********** User Config *********/
-// Assign a unique identifier for this node, 0 or 1
-// 0 Rx / 1 Tx
-bool radioNumber = 0;
-unsigned long timeoutPeriod = 3000;     // Set a user-defined timeout period. With auto-retransmit set to (15,15) retransmission will take up to 60ms and as little as 7.5ms with it set to (1,15).
-
-/********************************/
-
-// Radio pipe addresses for the 2 nodes to communicate.
-// const uint8_t pipes[][6] = {"1Node","2Node"};
-<<<<<<< HEAD
-const uint64_t pipes[2] = {0xC2C2C2C2C2LL, 0xE7E7E7E7E7LL};   // Radio pipe addresses for the 2 nodes to communicate.
-=======
-const uint64_t pipes[2] = { 0xE7E7E7E7E7LL, 0xC2C2C2C2C2LL };   // Radio pipe addresses for the 2 nodes to communicate.
->>>>>>> d5095c9971bdcae29aa8cee02f788f79834fbbc0
-char data[32] = {"Bla Message - does it work?"};            //Data buffer
-
-int data_received(char *data, uint8_t len)
+void twi_short_message(char *msg)
 {
-    int out = 0;
-    int i;
-    for(i=0; i<len; i++)
-    {
-        if(isprint(data[i]))
-            out = 1;
-    }
+    char twi_string[32];
+    memset(twi_string, '\0',sizeof(twi_string));
+    memcpy(twi_string, msg, strlen(msg)+1);
+    twi_write_data(0x44,(uint8_t*)twi_string, 32);
+}
+
+void twi_byte_message(uint8_t b)
+{
+    twi_write_data(0x44, &b,1);
+}
+
+void twi_bytes_message(uint8_t *b, uint8_t len)
+{
+    twi_write_data(0x44, b, len);
+}
+
+
+void rf24_init()
+{
+    // set IRQ as input pin and CE as output pin
+    DDR_RF24 &= ~(1<<DD_RF24_IRQ);
+    DDR_RF24 |= (1<<DD_RF24_CE);
+
+    // clear CE to for standy/power down mode
+    PORT_RF24 &= ~(1<<P_RF24_CE);
+
+    // enable interrupt on IRQ pin (PD2)
+//    MCUCR = (1<<ISC01)|(0<<ISC00);
+//    GICR = (1<<INT0);
+
+    spi_init();
+}
+
+void rf24_config_register(uint8_t reg, uint8_t value)
+{
+    RF24_SS_LO;
+    spi_write_byte((RF24_W_REGISTER | (RF24_REGISTER_MASK & reg)));
+    spi_write_byte(value);
+    RF24_SS_HI;
+}
+
+void rf24_write_register(uint8_t reg, uint8_t *value, uint8_t len)
+{
+    RF24_SS_LO;
+    spi_write_byte((RF24_W_REGISTER | (RF24_REGISTER_MASK & reg)));
+    spi_write(value,len);
+    RF24_SS_HI;
+}
+
+void rf24_config_tx()
+{
+    rf24_config_register(RF24_RF_CH,VAR_RF_CHANNEL);
+    rf24_config_register(RF24_RF_SETUP,VAR_RF_SETUP);
+    rf24_config_register(RF24_CONFIG,VAR_CONFIG);
+    rf24_config_register(RF24_SETUP_RETR,(RF24_SETUP_RETR_ARD_4000 | RF24_SETUP_RETR_ARC_15));
+}
+
+uint8_t rf24_read_status()
+{
+    uint8_t out;
+    RF24_SS_LO;
+    out = spi_write_read_byte(RF24_NOP);
+    RF24_SS_HI;
     return out;
 }
 
-void showData(void)
+void rf24_read_register(uint8_t reg, uint8_t *data_read, uint8_t len)
 {
-    if(data_received(data,32))
-//    if(1)
-    {
-        printf("Data: ");
-        for(int i=0; i<32; i++){
-            if(isprint(data[i]))
-                printf("%c", data[i]);
-            else
-                printf(".");
-        }
-        printf("\n\r");
-    }
+    RF24_SS_LO;
+    spi_write_byte((RF24_R_REGISTER | (RF24_REGISTER_MASK & reg)));
+    spi_write_read(data_read, data_read, len);
+    RF24_SS_HI;
 }
 
-int main(int argc, char** argv){
+uint8_t rf24_read_register_byte(uint8_t reg)
+{
+    uint8_t out = 0;
+    RF24_SS_LO;
+    spi_write_byte((RF24_R_REGISTER | (RF24_REGISTER_MASK & reg)));
+    out = spi_write_read_byte(out);
+    RF24_SS_HI;
+    return out;
+}
 
-  const int role_rx=0, role_tx=1;
-  int role=role_rx;
-/********* Role chooser ***********/
+void rf24_send_message(uint8_t *value, uint8_t len)
+{
+    rf24_config_register(RF24_CONFIG,(VAR_CONFIG | (RF24_CONFIG_PWR_UP)));
 
-  printf("\n ************ Role Setup ***********\n");
-  string input = "";
-  char myChar = {0};
+    RF24_CE_LO;
 
-  cout << "Choose a role: Enter 0 for Rx, 1 for Tx (CTRL+C to exit) \n>";
-  getline(cin,input);
+    RF24_SS_LO;
+    spi_write_byte(RF24_FLUSH_TX);
+    RF24_SS_HI;
 
-  if(input.length() == 1) {
-    myChar = input[0];
-    if(myChar == '0'){
-        cout << "Role: Rx " << endl << endl;
-    }else{  cout << "Role: Tx " << endl << endl;
-        role = role_tx;
-    }
-  }
-  switch(role) {
-      case role_rx :
-        radioNumber=0;
-        break;
+    uint8_t debug;
 
-      case role_tx :
-        radioNumber=1;
-        break;
-  }
+    twi_short_message("clear MAX_RT");
+    rf24_config_register(RF24_STATUS,0x70); //clear bits:6,5,4
+    twi_short_message("tx flushed");
+    twi_short_message("RF24_FIFO_STATUS: ");
+    debug = rf24_read_register_byte(RF24_FIFO_STATUS);
+    twi_byte_message(debug);
+    twi_short_message("RF24_OBSERVE_TX: ");
+    debug = rf24_read_register_byte(RF24_OBSERVE_TX);
+    twi_byte_message(debug);
+    twi_short_message("Status: ");
+    debug = rf24_read_status();
+    twi_byte_message(debug);
 
-/***********************************/
-  // Setup and configure rf radio
-  radio.begin();
 
-  // optionally, increase the delay between retries & # of retries
-  radio.setRetries(15,15);
-  // Set the channel
-  radio.setChannel(1);
-  // Set the data rate
-  //radio.setDataRate(RF24_2MBPS);
-  radio.setDataRate(RF24_250KBPS);
-  //radio.setPALevel(RF24_PA_MAX);
-  radio.setPALevel(RF24_PA_MIN);
+    RF24_SS_LO;
+    spi_write_byte(RF24_W_TX_PAYLOAD);
+    spi_write(value,len);
+    RF24_SS_HI;
 
-    if ( !radioNumber )    {
-        radio.openWritingPipe(pipes[0]);
-        radio.openReadingPipe(1,pipes[1]);
-        memset(&data,'\0',sizeof(data));
-        radio.startListening();
-    } else {
-        radio.openWritingPipe(pipes[1]);
-        radio.openReadingPipe(1,pipes[0]);
-        radio.stopListening();
-    }
-    // Dump the configuration of the rf unit for debugging
-    radio.printDetails();
-    printf("Start loop:\n");
-    // forever loop
-    uint16_t counter = 0;
-    while (1)
+    twi_short_message("payload written");
+    twi_short_message("RF24_FIFO_STATUS: ");
+    debug = rf24_read_register_byte(RF24_FIFO_STATUS);
+    twi_byte_message(debug);
+
+
+    RF24_CE_HI;
+    _delay_us(20);
+    RF24_CE_LO;
+
+    twi_short_message("payload sent");
+    twi_short_message("RF24_FIFO_STATUS: ");
+    debug = rf24_read_register_byte(RF24_FIFO_STATUS);
+    twi_byte_message(debug);
+
+    twi_short_message("RF24_OBSERVE_TX: ");
+    debug = rf24_read_register_byte(RF24_OBSERVE_TX);
+    twi_byte_message(debug);
+    twi_short_message("Status: ");
+    debug = rf24_read_status();
+    twi_byte_message(debug);
+}
+
+
+
+int main()
+{
+    uint8_t debug;
+    uint8_t debug2[8];
+    twi_init(3,255); //prescaler=2, bitrate=255 -> ~1kHz SCL
+    twi_short_message("twi initialised");
+
+    rf24_init();
+    twi_short_message("rf24 initialised");
+
+
+    rf24_config_tx();
+    twi_short_message("rf24 tx configured");
+
+    twi_short_message("Status: ");
+    debug = rf24_read_status();
+    twi_byte_message(debug);
+//
+//    twi_short_message("RX_ADDR_P0: ");
+//    rf24_read_register(RF24_RX_ADDR_P0,debug2,5);
+//    twi_bytes_message(debug2,5);
+//
+//    twi_short_message("RX_ADDR_P1: ");
+//    rf24_read_register(RF24_RX_ADDR_P1,debug2,5);
+//    twi_bytes_message(debug2,5);
+//
+//    twi_short_message("RX_ADDR_P2: ");
+//    rf24_read_register(RF24_RX_ADDR_P2,debug2,5);
+//    twi_bytes_message(debug2,5);
+//
+//    twi_short_message("RX_ADDR_P3: ");
+//    rf24_read_register(RF24_RX_ADDR_P3,debug2,5);
+//    twi_bytes_message(debug2,5);
+//
+//    twi_short_message("RX_ADDR_P4: ");
+//    rf24_read_register(RF24_RX_ADDR_P4,debug2,5);
+//    twi_bytes_message(debug2,5);
+//
+//    twi_short_message("RX_ADDR_P5: ");
+//    rf24_read_register(RF24_RX_ADDR_P5,debug2,5);
+//    twi_bytes_message(debug2,5);
+//
+//    twi_short_message("TX_ADDR: ");
+//    rf24_read_register(RF24_TX_ADDR,debug2,5);
+//    twi_bytes_message(debug2,5);
+//
+//    twi_short_message("RX_PW_P0: ");
+//    debug = rf24_read_register_byte(RF24_RX_PW_P0);
+//    twi_byte_message(debug);
+//
+//    twi_short_message("RX_PW_P1: ");
+//    debug = rf24_read_register_byte(RF24_RX_PW_P1);
+//    twi_byte_message(debug);
+//
+//    twi_short_message("RX_PW_P2: ");
+//    debug = rf24_read_register_byte(RF24_RX_PW_P2);
+//    twi_byte_message(debug);
+//
+//    twi_short_message("RX_PW_P3: ");
+//    debug = rf24_read_register_byte(RF24_RX_PW_P3);
+//    twi_byte_message(debug);
+//
+//    twi_short_message("RX_PW_P4: ");
+//    debug = rf24_read_register_byte(RF24_RX_PW_P4);
+//    twi_byte_message(debug);
+//
+//    twi_short_message("RX_PW_P5: ");
+//    debug = rf24_read_register_byte(RF24_RX_PW_P5);
+//    twi_byte_message(debug);
+//
+//    twi_short_message("EN_AA: ");
+//    debug = rf24_read_register_byte(RF24_EN_AA);
+//    twi_byte_message(debug);
+//
+//    twi_short_message("EN_RXADDR: ");
+//    debug = rf24_read_register_byte(RF24_EN_RXADDR);
+//    twi_byte_message(debug);
+//
+//    twi_short_message("RF_CH: ");
+//    debug = rf24_read_register_byte(RF24_RF_CH);
+//    twi_byte_message(debug);
+//
+//    twi_short_message("RF_SETUP: ");
+//    debug = rf24_read_register_byte(RF24_RF_SETUP);
+//    twi_byte_message(debug);
+//
+//    twi_short_message("CONFIG: ");
+//    debug = rf24_read_register_byte(RF24_CONFIG);
+//    twi_byte_message(debug);
+//
+//    twi_short_message("DYNPD: ");
+//    debug = rf24_read_register_byte(RF24_DYNPD);
+//    twi_byte_message(debug);
+//
+//    twi_short_message("FEATURE: ");
+//    debug = rf24_read_register_byte(RF24_FEATURE);
+//    twi_byte_message(debug);
+//
+//    twi_short_message("sending data");
+//    twi_short_message("dummy message");
+
+
+    uint8_t data[32];
+    uint8_t data2[32];
+    uint8_t data3[32];
+    uint8_t data4[32];
+    uint8_t i;
+    for(i=0; i<32; i++)
     {
-        if (radioNumber) {
-            if (radio.writeBlocking(&data,sizeof(data),timeoutPeriod)) {
-                printf(".");
-            }
-            else {
-                printf("?");
-            }
-            fflush(stdout);
-            //printf("\n");
-        }
-        else {
-        //
-        // Receive each packet, dump it
-        //
-            if(radio.available()){
-                // Read any available payloads for analysis
-                radio.read(&data,32);
-                // Dump the printable data of the payload
-                showData();
-                fflush(stdout);
-            }
-            if(counter++ == 8000)
-            {
-                counter = 0;
-                radio.printDetails();
-            }
-        }
-        delay(5);
-    } // forever loop
+        data[i] = i*i;
+        data2[i] = 255-i;
+        data3[i] = 3*i;
+        data4[i] = (i/2*3)/2*i;
+    }
+    twi_short_message("send data");
+    rf24_send_message(data,32);
+    twi_short_message("send data2");
+    rf24_send_message(data2,32);
+    twi_short_message("send data3");
+    rf24_send_message(data3,32);
+    twi_short_message("send data4");
+    rf24_send_message(data4,32);
 
-  return 0;
+    twi_short_message("data sent");
+
+    twi_short_message("dummy message");
+
+    while(1);
 }
