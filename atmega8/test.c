@@ -18,10 +18,6 @@
 // IRQ setup, enable CRC, CRC-setting, RX/TX POWER UP, RX/TX control
 #define VAR_CONFIG      (RF24_CONFIG_MASK_RX_DR | RF24_CONFIG_EN_CRC | RF24_CONFIG_CRCO)
 
-void ISR(INT0_vect)
-{
-}
-
 void rf24_init()
 {
     // set IRQ as input pin and CE as output pin

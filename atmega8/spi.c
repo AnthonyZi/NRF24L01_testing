@@ -3,6 +3,8 @@
 #include <avr/io.h>
 #include <avr/interrupt.h>
 
+#define SPI_SS_HI               PORT_SPI |= (1<<P_SPI_SS);
+#define SPI_SS_LO               PORT_SPI &= ~(1<<P_SPI_SS);
 
 void spi_init()
 {
