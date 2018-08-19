@@ -1,3 +1,5 @@
+#define  F_CPU           8000000UL
+
 #include "spi.h"
 #include "twi.h"
 #include "rf24.h"
@@ -114,55 +116,27 @@ uint8_t rf24_read_register_byte(uint8_t reg)
 void rf24_send_message(uint8_t *value, uint8_t len)
 {
     rf24_config_register(RF24_CONFIG,(VAR_CONFIG | (RF24_CONFIG_PWR_UP)));
+    _delay_us(1500);
 
     RF24_CE_LO;
+    _delay_us(130);
 
     RF24_SS_LO;
     spi_write_byte(RF24_FLUSH_TX);
     RF24_SS_HI;
 
-    uint8_t debug;
-
-    twi_short_message("clear MAX_RT");
     rf24_config_register(RF24_STATUS,0x70); //clear bits:6,5,4
-    twi_short_message("tx flushed");
-    twi_short_message("RF24_FIFO_STATUS: ");
-    debug = rf24_read_register_byte(RF24_FIFO_STATUS);
-    twi_byte_message(debug);
-    twi_short_message("RF24_OBSERVE_TX: ");
-    debug = rf24_read_register_byte(RF24_OBSERVE_TX);
-    twi_byte_message(debug);
-    twi_short_message("Status: ");
-    debug = rf24_read_status();
-    twi_byte_message(debug);
-
 
     RF24_SS_LO;
     spi_write_byte(RF24_W_TX_PAYLOAD);
     spi_write(value,len);
     RF24_SS_HI;
 
-    twi_short_message("payload written");
-    twi_short_message("RF24_FIFO_STATUS: ");
-    debug = rf24_read_register_byte(RF24_FIFO_STATUS);
-    twi_byte_message(debug);
-
-
     RF24_CE_HI;
-    _delay_us(20);
+    _delay_us(10);
     RF24_CE_LO;
 
-    twi_short_message("payload sent");
-    twi_short_message("RF24_FIFO_STATUS: ");
-    debug = rf24_read_register_byte(RF24_FIFO_STATUS);
-    twi_byte_message(debug);
-
-    twi_short_message("RF24_OBSERVE_TX: ");
-    debug = rf24_read_register_byte(RF24_OBSERVE_TX);
-    twi_byte_message(debug);
-    twi_short_message("Status: ");
-    debug = rf24_read_status();
-    twi_byte_message(debug);
+    _delay_ms(2);
 }
 
 
@@ -276,23 +250,26 @@ int main()
     uint8_t i;
     for(i=0; i<32; i++)
     {
-        data[i] = i*i;
+        data[i] = 0;
         data2[i] = 255-i;
         data3[i] = 3*i;
         data4[i] = (i/2*3)/2*i;
     }
-    twi_short_message("send data");
-    rf24_send_message(data,32);
-    twi_short_message("send data2");
-    rf24_send_message(data2,32);
-    twi_short_message("send data3");
-    rf24_send_message(data3,32);
-    twi_short_message("send data4");
-    rf24_send_message(data4,32);
+    while(1)
+    {
+        data[0] += 1;
+//        twi_short_message("send data");
+        rf24_send_message(data,32);
+//        twi_short_message("send data2");
+//        rf24_send_message(data2,32);
+//        twi_short_message("send data3");
+//        rf24_send_message(data3,32);
+//        twi_short_message("send data4");
+//        rf24_send_message(data4,32);
+        _delay_ms(1000);
+    }
 
-    twi_short_message("data sent");
 
     twi_short_message("dummy message");
 
-    while(1);
 }

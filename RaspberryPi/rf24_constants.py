@@ -96,6 +96,7 @@ STATUS                     = 0x07
 STATUS_RX_DR               = 0x40
 STATUS_TX_DS               = 0x20
 STATUS_MAX_RT              = 0x10
+STATUS_IRQ_MASK            = 0x70
 STATUS_RX_P_NO             = 0x0E
 STATUS_TX_FULL             = 0x01
 
